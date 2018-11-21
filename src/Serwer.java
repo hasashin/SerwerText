@@ -167,6 +167,7 @@ class Serwer {
     }
 
     private void execute(String operacja, String odpowiedz, int liczba, int id, DatagramPacket pakiet) {
+        wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
         if (operacja.equals("notify") && odpowiedz.equals("liczba")) {
             sprawdz(liczba, pakiet);
         }
@@ -178,7 +179,7 @@ class Serwer {
         if (operacja.equals("connect") && odpowiedz.equals("chce")){
             id = generuj();
             System.out.println("Klient " + id + " połączył się");
-            wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
+            wyslijpakiet("answer","accept", id,0, pakiet.getAddress(), pakiet.getPort());
             DatagramPacket pak = new DatagramPacket(new byte[256],256,pakiet.getAddress(),pakiet.getPort());
             klienci.add(new Pair(id, pak));
         }
@@ -186,7 +187,6 @@ class Serwer {
             return;
         }
 
-        wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
     }
 
     private void zakoncz(int id) {
