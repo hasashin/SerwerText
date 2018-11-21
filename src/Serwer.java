@@ -35,7 +35,7 @@ class Serwer {
 
     int getIdbyPacket(DatagramPacket dat){
         for(Pair elem : klienci){
-            if(dat == elem.value){
+            if(dat.getAddress() == elem.value.getAddress() && dat.getPort() == elem.value.getPort()){
                 return elem.key;
             }
         }
