@@ -22,6 +22,7 @@ class Serwer {
     private boolean warunek = true;
     private DatagramSocket socket;
     Vector<Pair> klienci = new Vector<>();
+    Thread l1;
 
 
     Serwer(int port) {
@@ -205,6 +206,8 @@ class Serwer {
                 warunek = false;
             }
         }
+
+        l1.interrupt();
     }
 
 
@@ -216,10 +219,16 @@ class Serwer {
         maxczas();
         losujliczbe();
 
-        Thread l1 = new Thread(new Klient(socket, this));
+        l1 = new Thread(new Klient(socket, this));
 
+        l1.start();
 
+        while(klienci.size() < 2){
+            try{ Thread.sleep(100);}
+            catch (InterruptedException e) {System.err.println(e.getMessage());}
+        }
 
+        runGaame();
     }
 
 }
