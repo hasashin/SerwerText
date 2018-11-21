@@ -215,10 +215,6 @@ class Serwer {
         generuj();
         System.out.println("Oczekiwanie na klientów...");
 
-        System.out.println("Przygotowywanie gry");
-        maxczas();
-        losujliczbe();
-
         l1 = new Thread(new Klient(socket, this));
 
         l1.start();
@@ -227,6 +223,10 @@ class Serwer {
             try{ Thread.sleep(100);}
             catch (InterruptedException e) {System.err.println(e.getMessage());}
         }
+
+        System.out.println("Przygotowywanie gry");
+        maxczas();
+        losujliczbe();
 
         runGaame();
     }
