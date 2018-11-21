@@ -168,6 +168,7 @@ class Serwer {
     private void execute(String operacja, String odpowiedz, int liczba, int id, DatagramPacket pakiet) {
         if (!operacja.equals("response") && !odpowiedz.equals("ACK"))
             wyslijpakiet("response", "ACK", id, 0, 0, pakiet.getAddress(), pakiet.getPort());
+
         if (operacja.equals("notify") && odpowiedz.equals("liczba")) {
             sprawdz(liczba, pakiet);
         }
@@ -182,6 +183,8 @@ class Serwer {
             wyslijpakiet("answer", "accept", id, 0, 0, pakiet.getAddress(), pakiet.getPort());
             DatagramPacket pak = new DatagramPacket(new byte[256], 256, pakiet.getAddress(), pakiet.getPort());
             klienci.add(new Pair(id, pak));
+            if(klienci.size() >= 2)
+                broadcast("start", "start", 0, 0);
         }
         if (operacja.equals("response") && odpowiedz.equals("ACK")) {
             return;
@@ -204,7 +207,6 @@ class Serwer {
     }
 
     void runGaame() {
-        broadcast("start", "start", 0, 0);
         long dziesiec = System.currentTimeMillis() / 1000;
         poczatkowy = System.currentTimeMillis() / 1000;
         System.out.println("Start");
