@@ -195,6 +195,7 @@ class Serwer {
     }
 
     void runGaame(){
+        broadcast("start","start", 0, 0 );
         long dziesiec = System.currentTimeMillis() / 1000;
         poczatkowy = System.currentTimeMillis() / 1000;
         System.out.println("Start");
