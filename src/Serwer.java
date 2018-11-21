@@ -180,7 +180,7 @@ class Serwer {
             klienci.add(new Pair(id, pakiet));
         }
         if(operacja.equals("response") && odpowiedz.equals("ACK")){
-
+            return;
         }
 
         wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
