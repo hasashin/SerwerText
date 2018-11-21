@@ -9,7 +9,6 @@ public class Klient implements Runnable {
     private int port;
     private Serwer ser;
     DatagramPacket pakiet = new DatagramPacket(new byte[256], 256);
-    boolean warunek = true;
     DatagramSocket socket;
 
     Klient(DatagramSocket socket, Serwer ser) {
@@ -18,7 +17,7 @@ public class Klient implements Runnable {
     }
 
     public void run() {
-        while (warunek){
+        while (ser.warunek){
             try{
                 socket.receive(pakiet);
                 if(pakiet.getLength() > 0){
