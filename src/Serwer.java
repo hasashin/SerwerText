@@ -143,7 +143,8 @@ class Serwer {
 
         for(String elem : options){
             String[] temp = elem.split("[?]");
-            optionsSplit.put(temp[0],temp[1]);
+            if(temp.length == 2)
+                optionsSplit.put(temp[0],temp[1]);
         }
 
         liczba = Integer.parseInt(optionsSplit.get("LI"));
@@ -178,6 +179,10 @@ class Serwer {
             wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
             klienci.add(new Pair(id, pakiet));
         }
+        if(operacja.equals("response") && odpowiedz.equals("ACK")){
+
+        }
+
         wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
     }
 
