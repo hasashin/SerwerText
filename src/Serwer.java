@@ -1,7 +1,9 @@
 import java.io.IOException;
 import java.net.*;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Random;
+import java.util.Set;
 
 
 class Serwer {
@@ -9,6 +11,7 @@ class Serwer {
     private int czasrozgrywki;
     private long poczatkowy;
     private int liczba;
+    private int numerklienta;
     private boolean warunek = true;
     private DatagramSocket socket;
     Hashtable<Integer,DatagramPacket> klienci = new Hashtable<>();
@@ -22,14 +25,31 @@ class Serwer {
         }
     }
 
-    private void generuj() {
+    private int generuj() {
         Random generator = new Random();
-        id1 = (generator.nextInt(30) + 1);
-        id2 = (generator.nextInt(30) + 1);
+        numerklienta = (generator.nextInt(30) + 1);
+
+        Set<Integer> setOfIds = klienci.keySet();
+        Iterator <Integer> iterator = setOfIds.iterator();
+
+        while(iterator.hasNext()){
+            int key = iterator.next();
+
+           if(numerklienta == key){
+               return 0;
+           }
+        }
+        return numerklienta;
     }
 
     private void maxczas() {
-        czasrozgrywki = (Math.abs(id1 - id2) * 74) % 90 + 24;
+
+        Object[] setOfIds = klienci.keySet().toArray();
+
+        int id1 = (Integer)setOfIds[0];
+        int id2 = (Integer)setOfIds[1];
+
+        czasrozgrywki = (Math.abs(id1 - id2) * 99) % 100 + 30;
     }
 
     private void losujliczbe() {
@@ -111,12 +131,12 @@ class Serwer {
 
         System.out.println("Start");
 
-        long pietnascie = System.currentTimeMillis() / 1000;
+        long dziesiec = System.currentTimeMillis() / 1000;
 
         while (warunek) {
-            if ((System.currentTimeMillis() / 1000 - pietnascie) > 14) {
+            if ((System.currentTimeMillis() / 1000 - dziesiec) > 9) {
                 ileczasu();
-                pietnascie = System.currentTimeMillis() / 1000;
+                dziesiec = System.currentTimeMillis() / 1000;
             }
             if ((poczatkowy * czasrozgrywki) - System.currentTimeMillis() / 1000 <= 0) {
                 ileczasu();
