@@ -1,12 +1,19 @@
 import java.io.IOException;
 import java.net.*;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
 
 class Serwer {
+
+    class Pair {
+        public final Integer key;
+        public final DatagramPacket value;
+
+        Pair(Integer x, DatagramPacket y){
+            this.key = x;
+            this.value = y;
+        }
+    }
 
     private int czasrozgrywki;
     private long poczatkowy;
@@ -14,7 +21,7 @@ class Serwer {
     private int numerklienta;
     private boolean warunek = true;
     private DatagramSocket socket;
-    Hashtable<Integer,DatagramPacket> klienci = new Hashtable<>();
+    Vector<Pair> klienci = new Vector<>();
 
 
     Serwer(int port) {
@@ -25,29 +32,31 @@ class Serwer {
         }
     }
 
+    DatagramPacket getPacketById(int id){
+        for(Pair elem : klienci){
+            if(id == elem.key){
+                return elem.value;
+            }
+        }
+        return null;
+    }
+
     private int generuj() {
         Random generator = new Random();
         numerklienta = (generator.nextInt(30) + 1);
 
-        Set<Integer> setOfIds = klienci.keySet();
-        Iterator <Integer> iterator = setOfIds.iterator();
-
-        while(iterator.hasNext()){
-            int key = iterator.next();
-
-           if(numerklienta == key){
-               return 0;
-           }
+        for(Pair elem : klienci){
+            if(numerklienta == elem.key){
+                return 0;
+            }
         }
         return numerklienta;
     }
 
     private void maxczas() {
 
-        Object[] setOfIds = klienci.keySet().toArray();
-
-        int id1 = (Integer)setOfIds[0];
-        int id2 = (Integer)setOfIds[1];
+        int id1 = klienci.get(0).key;
+        int id2 = klienci.get(1).key;
 
         czasrozgrywki = (Math.abs(id1 - id2) * 99) % 100 + 30;
     }
@@ -58,80 +67,131 @@ class Serwer {
         System.out.println("Wybrano " + liczba);
     }
 
-    void sprawdz(int odp, Klient k) {
-        if (odp == liczba) {
-            k.wyslijpakiet(7, 1, 0, 0);
+    void broadcast(String operacja, String odpowiedz, int liczba, int czas){
+        for(Pair elem : klienci){
+            wyslijpakiet(operacja, odpowiedz, liczba, czas, elem.value.getAddress(), elem.value.getPort());
+        }
+    }
 
-            if (k.equals(k1)) {
-                k2.wyslijpakiet(7, 0, liczba, 0);
-            } else {
-                k1.wyslijpakiet(7, 0, liczba, 0);
+    void sprawdz(int odp, DatagramPacket dat) {
+        if (odp == liczba) {
+            wyslijpakiet("end", "wygrana", liczba, 0, dat.getAddress(), dat.getPort());
+
+            for(Pair elem : klienci){
+                if(elem.value != dat){
+                    wyslijpakiet("end", "przegrana", liczba, 0, dat.getAddress(), dat.getPort());
+                }
             }
         } else {
             if(odp < liczba)
-                k.wyslijpakiet(3, 1, 0, 0);
+                wyslijpakiet("nofity", "duza", 0, 0, dat.getAddress(), dat.getPort());
             else
-                k.wyslijpakiet(3, 4, 0, 0);
+                wyslijpakiet("notify", "mala", 0, 0, dat.getAddress(), dat.getPort());
         }
     }
 
     private void ileczasu() {
         long obecny = System.currentTimeMillis() / 1000;
         long uplynelo = obecny - poczatkowy;
-        long zostalo = czasrozgrywki - uplynelo;
+        int zostalo = (int)(czasrozgrywki - uplynelo);
         if (zostalo > 0) {
             System.out.println("Zostalo " + zostalo + " sekund");
-            k1.wyslijpakiet(3, 2, 0, (int) zostalo);
-            k2.wyslijpakiet(3, 2, 0, (int) zostalo);
+            broadcast("notify", "czas", 0, zostalo);
         } else {
-            k1.wyslijpakiet(7, 2, 0, 0);
-            k2.wyslijpakiet(7, 2, 0, 0);
+            broadcast("end", "koniecCzasu", 0, 0);
             warunek = false;
         }
 
     }
 
-    void wyslijpakiet(int operacja, int odpowiedz, int liczba, int czas) {
+    private DatagramPacket generujPakiet(String operacja, String odpowiedz, int id, int liczba, InetAddress ip, int port) {
+
+        byte[] buff = new byte[256];
+
+        DatagramPacket pakiet = new DatagramPacket(buff,256);
+
+        String komunikat = "";
+
+        komunikat += "OP?"+operacja+"<<";
+        komunikat += "OD?"+odpowiedz+"<<";
+        komunikat += "ID?"+id+"<<";
+        komunikat += "LI?"+liczba+"<<";
+        komunikat += "CZ?"+0+"<<";
+
+        pakiet.setData(komunikat.getBytes());
+
+        pakiet.setAddress(ip);
+        pakiet.setPort(port);
+
+        return pakiet;
+    }
+
+    void wyslijpakiet(String operacja, String odpowiedz, int liczba, int czas, InetAddress ip, int port) {
         try {
-            out.write(generujPakiet(operacja, odpowiedz, liczba, czas), 0, 4);
+            socket.send(generujPakiet(operacja, odpowiedz, liczba, czas, ip, port));
         } catch (IOException r) {
             System.err.println(r.getMessage());
         }
     }
 
-    void start() {
-        generuj();
-        System.out.println("Oczekiwanie na klientów...");
-        k1 = new Klient(socket, id1, this);
-        System.out.println("Połączono 1/2, id " + id1);
-        k2 = new Klient(socket, id2, this);
-        System.out.println("Połączono 2/2, id " + id2);
+     void decode(DatagramPacket pakiet) {
+        int liczba,id;
+        String[] options = new String(pakiet.getData()).split("<<");
 
-        System.out.println("Przygotowywanie gry");
-        //poczatkowyczas = LocalTime.now();
-        maxczas();
-        losujliczbe();
-        poczatkowy = System.currentTimeMillis() / 1000;
-        //ileczasu();
+        Hashtable<String,String> optionsSplit = new Hashtable<>();
 
-        try {
-            socket.close();
-        } catch (IOException e) {
-            System.err.println(e.getMessage());
+        for(String elem : options){
+            String[] temp = elem.split("[?]");
+            optionsSplit.put(temp[0],temp[1]);
         }
 
-        Thread f1 = new Thread(k1);
-        Thread f2 = new Thread(k2);
+        liczba = Integer.parseInt(optionsSplit.get("LI"));
+        id = Integer.parseInt(optionsSplit.get("ID"));
 
-        k1.wyslijpakiet(2, 0, 0, 0);
-        k2.wyslijpakiet(2, 0, 0, 0);
+        Boolean warunek = false;
+        for(Pair elem : klienci){
+            if(elem.key == id){
+                warunek = true;
+                break;
+            }
+        }
 
-        f1.start();
-        f2.start();
+        if (warunek || id == 0) {
+            execute(optionsSplit.get("OP"), optionsSplit.get("OD"),liczba,id, pakiet);
+        } else {
+            System.out.println("Odebrano niepoprawny komunikat od serwera");
+        }
 
-        System.out.println("Start");
+    }
 
+    private void execute(String operacja, String odpowiedz, int liczba, int id, DatagramPacket pakiet) {
+        if (operacja.equals("notify") && odpowiedz.equals("liczba")) {
+            sprawdz(liczba, pakiet);
+        }
+        if (operacja.equals("end") && odpowiedz.equals("zakonczPol")) {
+            System.out.println("Klient " + id + " kończy połączenie");
+            zakoncz(id);
+        }
+        if (operacja.equals("connect") && odpowiedz.equals("chce")){
+            System.out.println("Klient " + id + " połączył się");
+            wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
+            klienci.add(new Pair(id, pakiet));
+        }
+        wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
+    }
+
+    private void zakoncz(int id) {
+        for(Pair elem : klienci){
+            if(elem.key == id){
+                klienci.remove(elem);
+            }
+        }
+    }
+
+    void runGaame(){
         long dziesiec = System.currentTimeMillis() / 1000;
+        poczatkowy = System.currentTimeMillis() / 1000;
+        System.out.println("Start");
 
         while (warunek) {
             if ((System.currentTimeMillis() / 1000 - dziesiec) > 9) {
@@ -141,13 +201,23 @@ class Serwer {
             if ((poczatkowy * czasrozgrywki) - System.currentTimeMillis() / 1000 <= 0) {
                 ileczasu();
             }
-            if (!f1.isAlive() && !f2.isAlive()) {
+            if (klienci.size() <= 0) {
                 warunek = false;
             }
         }
+    }
 
-        f1.interrupt();
-        f2.interrupt();
+
+    void start() {
+        generuj();
+        System.out.println("Oczekiwanie na klientów...");
+
+        System.out.println("Przygotowywanie gry");
+        maxczas();
+        losujliczbe();
+
+        Thread l1 = new Thread(new Klient(socket, this));
+
 
 
     }
