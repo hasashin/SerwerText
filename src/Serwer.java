@@ -84,8 +84,8 @@ class Serwer {
                 }
             }
         } else {
-            if(odp < liczba)
-                wyslijpakiet("nofity", "duza", 0, 0, dat.getAddress(), dat.getPort());
+            if(odp > liczba)
+                wyslijpakiet("notify", "duza", 0, 0, dat.getAddress(), dat.getPort());
             else
                 wyslijpakiet("notify", "mala", 0, 0, dat.getAddress(), dat.getPort());
         }
@@ -180,7 +180,7 @@ class Serwer {
             klienci.add(new Pair(id, pakiet));
         }
         if(operacja.equals("response") && odpowiedz.equals("ACK")){
-
+            return;
         }
 
         wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
