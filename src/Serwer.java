@@ -1,24 +1,22 @@
 import java.io.IOException;
-import java.net.ServerSocket;
+import java.net.*;
+import java.util.Hashtable;
 import java.util.Random;
 
 
 class Serwer {
 
-    private int id1;
-    private int id2;
     private int czasrozgrywki;
     private long poczatkowy;
     private int liczba;
     private boolean warunek = true;
-    private ServerSocket socket;
-    private Klient k1;
-    private Klient k2;
+    private DatagramSocket socket;
+    Hashtable<Integer,DatagramPacket> klienci = new Hashtable<>();
 
 
     Serwer(int port) {
         try {
-            socket = new ServerSocket(port);
+            socket = new DatagramSocket(port);
         } catch (IOException e) {
             System.out.println(e.getMessage());
         }
@@ -71,6 +69,14 @@ class Serwer {
             warunek = false;
         }
 
+    }
+
+    void wyslijpakiet(int operacja, int odpowiedz, int liczba, int czas) {
+        try {
+            out.write(generujPakiet(operacja, odpowiedz, liczba, czas), 0, 4);
+        } catch (IOException r) {
+            System.err.println(r.getMessage());
+        }
     }
 
     void start() {

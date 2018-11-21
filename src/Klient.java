@@ -5,24 +5,18 @@ import java.util.BitSet;
 public class Klient implements Runnable {
 
     private int id;
-    private Socket clientsocket;
-    private DataInputStream in;
-    private DataOutputStream out;
+    private InetAddress ip;
+    private int port;
     private Serwer ser;
     private byte[] pakiet = new byte[4];
     private boolean warunek = true;
 
-    Klient(ServerSocket ssocket, int clientid, Serwer s) {
-        try {
-            clientsocket = ssocket.accept();                                       // łączenie socketów ze sobą
-            in = new DataInputStream(clientsocket.getInputStream());
-            out = new DataOutputStream(clientsocket.getOutputStream());
+    Klient(DatagramPacket pakiet, int clientid, Serwer s) {
+            ip = pakiet.getAddress();
+            port = pakiet.getPort();
             id = clientid;
             ser = s;
             wyslijpakiet(0, 0, 0, 0);
-        } catch (IOException e) {
-            System.err.println(e.getMessage());
-        }
     }
 
     private byte[] generujPakiet(int operacja, int odpowiedz, int liczba, int czas) {
@@ -61,13 +55,7 @@ public class Klient implements Runnable {
         return ret;
     }
 
-    void wyslijpakiet(int operacja, int odpowiedz, int liczba, int czas) {
-        try {
-            out.write(generujPakiet(operacja, odpowiedz, liczba, czas), 0, 4);
-        } catch (IOException r) {
-            System.err.println(r.getMessage());
-        }
-    }
+
 
     private void zakoncz() {
         try {
