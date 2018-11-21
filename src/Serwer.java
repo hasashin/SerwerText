@@ -173,7 +173,6 @@ class Serwer {
         }
         if (operacja.equals("end") && odpowiedz.equals("zakonczPol")) {
             System.out.println("Klient " + id + " kończy połączenie");
-            l1.interrupt();
             delID = id;
             del = true;
         }
@@ -226,7 +225,13 @@ class Serwer {
             }
         }
 
-        l1.interrupt();
+        try {
+            l1.interrupt();
+            l1.join();
+        }
+        catch(InterruptedException e){
+            System.err.println(e.getMessage());
+        }
     }
 
 

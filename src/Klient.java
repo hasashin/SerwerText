@@ -4,16 +4,19 @@ import java.util.BitSet;
 
 public class Klient implements Runnable {
 
-    private int id;
-    private InetAddress ip;
-    private int port;
     private Serwer ser;
-    DatagramPacket pakiet = new DatagramPacket(new byte[256], 256);
-    DatagramSocket socket;
+    private DatagramPacket pakiet = new DatagramPacket(new byte[256], 256);
+    private DatagramSocket socket;
 
     Klient(DatagramSocket socket, Serwer ser) {
         this.socket = socket;
         this.ser = ser;
+        try{
+            this.socket.setSoTimeout(10);
+        }
+        catch(IOException e){
+            System.err.println(e.getMessage());
+        }
     }
 
     public void run() {
@@ -23,8 +26,15 @@ public class Klient implements Runnable {
                 if(pakiet.getLength() > 0){
                    ser.decode(pakiet);
                 }
+                if(Thread.currentThread().isInterrupted()){
+                    return;
+                }
             }
-            catch (IOException e){System.err.println(e.getMessage());}
+            catch (IOException e){
+                if(e.getMessage().equals("Receive timed out"))
+                    continue;
+                System.err.println(e.getMessage());
+            }
         }
     }
 
