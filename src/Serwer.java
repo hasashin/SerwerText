@@ -167,7 +167,8 @@ class Serwer {
     }
 
     private void execute(String operacja, String odpowiedz, int liczba, int id, DatagramPacket pakiet) {
-        wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
+        if(!operacja.equals("response") && !odpowiedz.equals("ACK"))
+            wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
         if (operacja.equals("notify") && odpowiedz.equals("liczba")) {
             sprawdz(liczba, pakiet);
         }
