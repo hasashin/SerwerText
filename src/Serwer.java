@@ -172,12 +172,15 @@ class Serwer {
         }
         if (operacja.equals("end") && odpowiedz.equals("zakonczPol")) {
             System.out.println("Klient " + id + " kończy połączenie");
+            l1.interrupt();
             zakoncz(id);
         }
         if (operacja.equals("connect") && odpowiedz.equals("chce")){
+            id = generuj();
             System.out.println("Klient " + id + " połączył się");
             wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
-            klienci.add(new Pair(id, pakiet));
+            DatagramPacket pak = new DatagramPacket(new byte[256],256,pakiet.getAddress(),pakiet.getPort());
+            klienci.add(new Pair(id, pak));
         }
         if(operacja.equals("response") && odpowiedz.equals("ACK")){
             return;
