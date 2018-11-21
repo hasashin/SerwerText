@@ -33,13 +33,13 @@ class Serwer {
         }
     }
 
-    DatagramPacket getPacketById(int id){
+    int getIdbyPacket(DatagramPacket dat){
         for(Pair elem : klienci){
-            if(id == elem.key){
-                return elem.value;
+            if(dat == elem.value){
+                return elem.key;
             }
         }
-        return null;
+        return 0;
     }
 
     private int generuj() {
@@ -70,24 +70,24 @@ class Serwer {
 
     void broadcast(String operacja, String odpowiedz, int liczba, int czas){
         for(Pair elem : klienci){
-            wyslijpakiet(operacja, odpowiedz, liczba, czas, elem.value.getAddress(), elem.value.getPort());
+            wyslijpakiet(operacja, odpowiedz, elem.key, liczba, czas, elem.value.getAddress(), elem.value.getPort());
         }
     }
 
     void sprawdz(int odp, DatagramPacket dat) {
         if (odp == liczba) {
-            wyslijpakiet("end", "wygrana", liczba, 0, dat.getAddress(), dat.getPort());
+            wyslijpakiet("end", "wygrana", getIdbyPacket(dat), liczba, 0, dat.getAddress(), dat.getPort());
 
             for(Pair elem : klienci){
                 if(elem.value != dat){
-                    wyslijpakiet("end", "przegrana", liczba, 0, dat.getAddress(), dat.getPort());
+                    wyslijpakiet("end", "przegrana", getIdbyPacket(dat), liczba, 0, dat.getAddress(), dat.getPort());
                 }
             }
         } else {
             if(odp > liczba)
-                wyslijpakiet("notify", "duza", 0, 0, dat.getAddress(), dat.getPort());
+                wyslijpakiet("notify", "duza", getIdbyPacket(dat),0, 0, dat.getAddress(), dat.getPort());
             else
-                wyslijpakiet("notify", "mala", 0, 0, dat.getAddress(), dat.getPort());
+                wyslijpakiet("notify", "mala", getIdbyPacket(dat),0, 0, dat.getAddress(), dat.getPort());
         }
     }
 
@@ -105,7 +105,7 @@ class Serwer {
 
     }
 
-    private DatagramPacket generujPakiet(String operacja, String odpowiedz, int id, int liczba, InetAddress ip, int port) {
+    private DatagramPacket generujPakiet(String operacja, String odpowiedz, int id, int liczba, int czas, InetAddress ip, int port) {
 
         byte[] buff = new byte[256];
 
@@ -117,7 +117,7 @@ class Serwer {
         komunikat += "OD?"+odpowiedz+"<<";
         komunikat += "ID?"+id+"<<";
         komunikat += "LI?"+liczba+"<<";
-        komunikat += "CZ?"+0+"<<";
+        komunikat += "CZ?"+czas+"<<";
 
         pakiet.setData(komunikat.getBytes());
 
@@ -127,9 +127,10 @@ class Serwer {
         return pakiet;
     }
 
-    void wyslijpakiet(String operacja, String odpowiedz, int liczba, int czas, InetAddress ip, int port) {
+    void wyslijpakiet(String operacja, String odpowiedz, int id, int liczba, int czas, InetAddress ip, int port) {
         try {
-            socket.send(generujPakiet(operacja, odpowiedz, liczba, czas, ip, port));
+
+            socket.send(generujPakiet(operacja, odpowiedz, id, liczba, czas, ip, port));
         } catch (IOException r) {
             System.err.println(r.getMessage());
         }
@@ -168,7 +169,7 @@ class Serwer {
 
     private void execute(String operacja, String odpowiedz, int liczba, int id, DatagramPacket pakiet) {
         if(!operacja.equals("response") && !odpowiedz.equals("ACK"))
-            wyslijpakiet("response","ACK", id,0, pakiet.getAddress(), pakiet.getPort());
+            wyslijpakiet("response","ACK", id,0, 0, pakiet.getAddress(), pakiet.getPort());
         if (operacja.equals("notify") && odpowiedz.equals("liczba")) {
             sprawdz(liczba, pakiet);
         }
@@ -180,7 +181,7 @@ class Serwer {
         if (operacja.equals("connect") && odpowiedz.equals("chce")){
             id = generuj();
             System.out.println("Klient " + id + " połączył się");
-            wyslijpakiet("answer","accept", id,0, pakiet.getAddress(), pakiet.getPort());
+            wyslijpakiet("answer","accept", id,0, 0, pakiet.getAddress(), pakiet.getPort());
             DatagramPacket pak = new DatagramPacket(new byte[256],256,pakiet.getAddress(),pakiet.getPort());
             klienci.add(new Pair(id, pak));
         }
