@@ -1,47 +1,82 @@
 import java.io.IOException;
 import java.net.*;
+import java.sql.Timestamp;
 import java.util.*;
 
 
 class Serwer {
 
     class Pair {
-        public final Integer key;
-        public final DatagramPacket value;
+        final Integer key;
+        final String value;
 
-        Pair(Integer x, DatagramPacket y) {
+        Pair(Integer x, String y) {
             this.key = x;
             this.value = y;
         }
     }
 
 
-    public int delID;
-    public boolean del = false;
+    private int delID;
+    private boolean del = false;
+    private boolean ingame = false;
     private int czasrozgrywki;
     private long poczatkowy;
     private int liczba;
-    boolean warunek = true;
     private DatagramSocket socket;
-    Vector<Pair> klienci = new Vector<>();
-    Thread l1;
-
+    private Vector<Pair> klienci = new Vector<>();
+    private Listener listener;
+    private Thread listenThread;
+    private Timestamp timestamp;
 
     Serwer(int port) {
         try {
             socket = new DatagramSocket(port);
+            listener = new Listener(socket,this);
+            timestamp = new Timestamp(System.currentTimeMillis());
         } catch (IOException e) {
             System.out.println(e.getMessage());
         }
     }
 
-    int getIdbyPacket(DatagramPacket dat) {
+    private boolean isClientConnected(String address){
+        String[] inetData = address.split(":");
+        boolean ret;
+        try{
+            DatagramSocket soc = new DatagramSocket(Integer.parseInt(inetData[1]),InetAddress.getByName(inetData[0]));
+            ret = false;
+            soc.close();
+        }
+        catch(IOException e){
+            ret = true;
+        }
+        return ret;
+    }
+
+    private int getIdByPacket(DatagramPacket dat) {
         for (Pair elem : klienci) {
-            if (dat.getAddress().getHostAddress().equals(elem.value.getAddress().getHostAddress()) && dat.getPort() == elem.value.getPort()) {
+            if(elem.value.equals(dat.getAddress().getHostAddress()+":"+dat.getPort())){
                 return elem.key;
             }
         }
         return 0;
+    }
+    private int getIdByPacket(String inetData){
+        for (Pair elem : klienci){
+            if(elem.value.equals(inetData)){
+                return elem.key;
+            }
+        }
+        return 0;
+    }
+
+    private String getStringFromID(int id){
+        for(Pair elem : klienci){
+            if(elem.key == id){
+                return elem.value;
+            }
+        }
+        return null;
     }
 
     private int generuj() {
@@ -71,21 +106,39 @@ class Serwer {
         System.out.println("Wybrano " + liczba);
     }
 
-    void broadcast(String operacja, String odpowiedz, int liczba, int czas) {
-        for (Pair elem : klienci) {
-            wyslijpakiet(operacja, odpowiedz, elem.key, liczba, czas, elem.value.getAddress(), elem.value.getPort());
+    private void broadcast(String operacja, String odpowiedz, int czas) {
+        Pair[] arr = new Pair[klienci.size()];
+        klienci.toArray(arr);
+        for (Pair elem : arr) {
+            String[] addr = elem.value.split(":");
+            try {
+                wyslijpakiet(operacja, odpowiedz, elem.key, 0, czas, InetAddress.getByName(addr[0]), Integer.parseInt(addr[1]));
+            }catch (IOException e){
+                System.err.println(e.getMessage()+"e");
+            }
         }
     }
 
-    void sprawdz(int odp, DatagramPacket dat) {
+    private void sprawdz(int odp, DatagramPacket dat) {
         if (odp == liczba) {
-            wyslijpakiet("end", "wygrana", getIdbyPacket(dat), liczba, 0, dat.getAddress(), dat.getPort());
-            broadcast("end","przegrana",liczba,0);
+            ingame = false;
+            wyslijpakiet("end", "wygrana", getIdByPacket(dat), liczba, 0, dat.getAddress(), dat.getPort());
+
+            for(Pair elem : klienci){
+                if(!elem.value.equals(dat.getAddress().getHostAddress()+":"+dat.getPort())){
+                    String[] inet = elem.value.split(":");
+                    try{
+                        wyslijpakiet("end","przegrana",getIdByPacket(elem.value),liczba,0,InetAddress.getByName(inet[0]),Integer.parseInt(inet[1]));
+                    }catch(IOException e){
+                        System.err.println(e.getMessage());
+                    }
+                }
+            }
         } else {
             if (odp > liczba)
-                wyslijpakiet("notify", "duza", getIdbyPacket(dat), 0, 0, dat.getAddress(), dat.getPort());
+                wyslijpakiet("notify", "duza", getIdByPacket(dat), 0, 0, dat.getAddress(), dat.getPort());
             else
-                wyslijpakiet("notify", "mala", getIdbyPacket(dat), 0, 0, dat.getAddress(), dat.getPort());
+                wyslijpakiet("notify", "mala", getIdByPacket(dat), 0, 0, dat.getAddress(), dat.getPort());
         }
     }
 
@@ -95,16 +148,14 @@ class Serwer {
         int zostalo = (int) (czasrozgrywki - uplynelo);
         if (zostalo > 0) {
             System.out.println("Zostalo " + zostalo + " sekund");
-            broadcast("notify", "czas", 0, zostalo);
+            broadcast("notify", "czas", zostalo);
         } else {
-            broadcast("end", "koniecCzasu", 0, 0);
-            warunek = false;
+            broadcast("end", "koniecCzasu", 0);
         }
 
     }
 
     private DatagramPacket generujPakiet(String operacja, String odpowiedz, int id, int liczba, int czas, InetAddress ip, int port) {
-
         byte[] buff = new byte[256];
 
         DatagramPacket pakiet = new DatagramPacket(buff, 256);
@@ -116,6 +167,8 @@ class Serwer {
         komunikat += "ID?" + id + "<<";
         komunikat += "LI?" + liczba + "<<";
         komunikat += "CZ?" + czas + "<<";
+        komunikat += "TS?" + timestamp.getTime() +"<<";
+        komunikat += "\0";
 
         pakiet.setData(komunikat.getBytes());
 
@@ -125,13 +178,20 @@ class Serwer {
         return pakiet;
     }
 
-    void wyslijpakiet(String operacja, String odpowiedz, int id, int liczba, int czas, InetAddress ip, int port) {
+    private void wyslijpakiet(String operacja, String odpowiedz, int id, int liczba, int czas, InetAddress ip, int port) {
         try {
-
-            socket.send(generujPakiet(operacja, odpowiedz, id, liczba, czas, ip, port));
+            if(isClientConnected(ip.getHostAddress()+":"+port))
+                socket.send(generujPakiet(operacja, odpowiedz, id, liczba, czas, ip, port));
+            else {
+                if(ingame) {
+                    System.out.println("Klient " + id + " rozłączył się");
+                    zakoncz(id);
+                }
+            }
         } catch (IOException r) {
             System.err.println(r.getMessage());
         }
+
     }
 
     void decode(DatagramPacket pakiet) {
@@ -149,31 +209,44 @@ class Serwer {
         liczba = Integer.parseInt(optionsSplit.get("LI"));
         id = Integer.parseInt(optionsSplit.get("ID"));
 
-        Boolean warunek = false;
+        boolean exists = false;
         for (Pair elem : klienci) {
             if (elem.key == id) {
-                warunek = true;
+                exists = true;
                 break;
             }
         }
 
-        if (warunek || id == 0) {
+        if (exists || id == 0) {
             execute(optionsSplit.get("OP"), optionsSplit.get("OD"), liczba, id, pakiet);
         } else {
-            System.out.println("Odebrano niepoprawny komunikat od serwera");
+            System.out.println("Odebrano niepoprawny komunikat od klienta "+id);
         }
 
     }
 
     private void execute(String operacja, String odpowiedz, int liczba, int id, DatagramPacket pakiet) {
-        if (!operacja.equals("response") && !odpowiedz.equals("ACK"))
+        if (!operacja.equals("response") && !odpowiedz.equals("ACK")) {
             wyslijpakiet("response", "ACK", id, 0, 0, pakiet.getAddress(), pakiet.getPort());
+            try{
+                Thread.sleep(100);
+            }catch(InterruptedException e){
+                System.err.println(e.getMessage());
+            }
+        }
 
         if (operacja.equals("notify") && odpowiedz.equals("liczba")) {
             sprawdz(liczba, pakiet);
         }
         if (operacja.equals("end") && odpowiedz.equals("zakonczPol")) {
             System.out.println("Klient " + id + " kończy połączenie");
+            while(del){
+                try{
+                    Thread.sleep(10);
+                }catch(InterruptedException e){
+                    System.err.println(e.getMessage());
+                }
+            }
             delID = id;
             del = true;
         }
@@ -182,12 +255,25 @@ class Serwer {
             System.out.println("Klient " + id + " połączył się");
             wyslijpakiet("answer", "accept", id, 0, 0, pakiet.getAddress(), pakiet.getPort());
             DatagramPacket pak = new DatagramPacket(new byte[256], 256, pakiet.getAddress(), pakiet.getPort());
-            klienci.add(new Pair(id, pak));
-            if(klienci.size() >= 2)
-                broadcast("start", "start", 0, 0);
-        }
-        if (operacja.equals("response") && odpowiedz.equals("ACK")) {
-            return;
+            klienci.add(new Pair(id, pak.getAddress().getHostAddress()+":"+pak.getPort()));
+
+            if(klienci.size() >= 2) {
+                if(!ingame){
+                    broadcast("start","start",0);
+                    ingame = true;
+                }else {
+                    try {
+                        String str;
+                        if ((str = getStringFromID(id)) != null) {
+                            String[] inetData = str.split(":");
+                            wyslijpakiet("start", "start", id, 0, 0, InetAddress.getByName(inetData[0]), Integer.parseInt(inetData[1]));
+                        } else
+                            System.err.println("Nieznany adres klienta " + id);
+                    } catch (Throwable e) {
+                        System.err.println(e.getMessage());
+                    }
+                }
+            }
         }
 
     }
@@ -201,18 +287,23 @@ class Serwer {
                 torem = elem;
             }
         }
-        if (torem != null) klienci.remove(torem);
+        if (torem != null) {
+            klienci.remove(torem);
+            if(klienci.size() == 0)
+                klienci = null;
+        }
         del = false;
         delID = 0;
     }
 
-    void runGaame() {
+    private void runGaame() {
         long dziesiec = System.currentTimeMillis() / 1000;
         poczatkowy = System.currentTimeMillis() / 1000;
         System.out.println("Start");
+        boolean warunek = true;
 
         while (warunek) {
-            if ((System.currentTimeMillis() / 1000 - dziesiec) > 9) {
+            if ((System.currentTimeMillis() / 1000 - dziesiec) >= 10) {
                 ileczasu();
                 dziesiec = System.currentTimeMillis() / 1000;
             }
@@ -222,14 +313,16 @@ class Serwer {
             if (del) {
                 zakoncz(delID);
             }
-            if (klienci.size() <= 0) {
+            if (klienci == null) {
+                listener.warunek = false;
                 warunek = false;
             }
         }
 
         try {
-            l1.interrupt();
-            l1.join();
+            socket.close();
+            listenThread.interrupt();
+            listenThread.join();
         }
         catch(InterruptedException e){
             System.err.println(e.getMessage());
@@ -241,9 +334,9 @@ class Serwer {
         generuj();
         System.out.println("Oczekiwanie na klientów...");
 
-        l1 = new Thread(new Klient(socket, this));
+        listenThread = new Thread(new Listener(socket, this));
 
-        l1.start();
+        listenThread.start();
 
         while (klienci.size() < 2) {
             try {

@@ -1,18 +1,18 @@
 import java.net.*;
 import java.io.*;
-import java.util.BitSet;
 
-public class Klient implements Runnable {
+public class Listener implements Runnable {
 
     private Serwer ser;
     private DatagramPacket pakiet = new DatagramPacket(new byte[256], 256);
     private DatagramSocket socket;
+    boolean warunek = true;
 
-    Klient(DatagramSocket socket, Serwer ser) {
+    Listener(DatagramSocket socket, Serwer ser) {
         this.socket = socket;
         this.ser = ser;
         try{
-            this.socket.setSoTimeout(10);
+            this.socket.setSoTimeout(50);
         }
         catch(IOException e){
             System.err.println(e.getMessage());
@@ -20,19 +20,22 @@ public class Klient implements Runnable {
     }
 
     public void run() {
-        while (ser.warunek){
+        while (warunek){
             try{
+
                 socket.receive(pakiet);
-                if(pakiet.getLength() > 0){
-                   ser.decode(pakiet);
-                }
-                if(Thread.currentThread().isInterrupted()){
-                    return;
-                }
+                ser.decode(pakiet);
+
             }
             catch (IOException e){
-                if(e.getMessage().equals("Receive timed out"))
+
+                if(e.getMessage().equals("Receive timed out")) {
                     continue;
+                }
+                else if(e.getMessage().equals("Socket closed")){
+                    warunek = false;
+                    break;
+                }
                 System.err.println(e.getMessage());
             }
         }
