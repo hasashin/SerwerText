@@ -20,18 +20,26 @@ public class Listener implements Runnable {
     }
 
     public void run() {
+
+        //pętla nasłuchująca komunikaty
         while (warunek){
             try{
 
+                //odbieranie pakietów
                 socket.receive(pakiet);
+
+                //dekodowanie pakietów
                 ser.decode(pakiet);
 
             }
             catch (IOException e){
 
+                //ignorowanie błędów dotyczących czasu oczekiwania na odpowiedź
                 if(e.getMessage().equals("Receive timed out")) {
                     continue;
                 }
+
+                //po zamknięciu gniazda pętla nasłuchująca kończy pracę
                 else if(e.getMessage().equals("Socket closed")){
                     warunek = false;
                     break;
